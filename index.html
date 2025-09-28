@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ASX Bets Live</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { --bg: 18 18 22; --gain:#00ff7a; --gain-glow:0 0 12px rgba(0,255,122,.45); --gold:#ffb23d; }
+    body {
+      background:
+        radial-gradient(1200px 600px at 20% -10%, rgba(0,255,140,0.08), transparent 40%),
+        radial-gradient(1000px 500px at 120% 10%, rgba(0,180,255,0.07), transparent 40%),
+        rgb(var(--bg));
+    }
+    .glass { background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.08); }
+    .neon { text-shadow: 0 0 12px rgba(0,255,140,.5); }
+    .chip { border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.06); border-radius: 9999px; padding: 2px 10px; font-size: 12px; }
+    .frame { border: 1px solid rgba(255,255,255,.12); border-radius: 16px; }
+    .gain-border { border-color: var(--gain)!important; box-shadow: 0 0 0 1px var(--gain), var(--gain-glow); }
+    .flash { animation: flashGain .6s ease-out; }
+    @keyframes flashGain { 0%{box-shadow:0 0 0 0 rgba(0,255,122,0)} 35%{box-shadow:0 0 0 3px rgba(0,255,122,.55),0 0 18px rgba(0,255,122,.55)} 100%{box-shadow:0 0 0 0 rgba(0,255,122,0)} }
+    a { color:#7de3ff } a:hover{ text-decoration: underline }
+    .fade-in{ animation: fade .25s ease-out } @keyframes fade{ from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+    .body-html p{ margin-bottom:.5rem }
+    #err{ display:none }
+    .btn-pause{ border:1px solid rgba(0,255,122,.7); background:rgba(0,255,122,.12); color:#dbffe9; border-radius:9999px; padding:6px 12px; font-size:12px; font-weight:700; letter-spacing:.3px }
+    .live-wrap{ display:flex; align-items:center; gap:.5rem }
+    .live-dot{ width:10px; height:10px; border-radius:9999px; background:#ff3b30; box-shadow:0 0 10px rgba(255,59,48,.9); animation:blink 1s infinite }
+    .live-dot.paused{ background:#ffd60a; box-shadow:0 0 10px rgba(255,214,10,.9); animation:blinkPause 1.2s infinite }
+    @keyframes blink{ 0%,60%{opacity:1} 60.1%,100%{opacity:.25} }
+    @keyframes blinkPause{ 0%,60%{opacity:1} 60.1%,100%{opacity:.45} }
+    .btn-tip{ border-radius:9999px; padding:6px 12px; font-size:12px; font-weight:700; background:linear-gradient(180deg,#ffd86b,#ffb23d); color:#222; border:1px solid rgba(255,178,61,.8); box-shadow: 0 2px 18px rgba(255,178,61,.35); text-decoration:none }
+    .btn-tip:hover{ filter:brightness(1.05); text-decoration:none }
+    .thread-guide{ border-left:2px solid rgba(255,255,255,.16) }
+    .parent-block{ background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); border-radius:12px; padding:12px }
+    .current-block{ background:rgba(255,255,255,.03); border-radius:12px; padding:12px; }
+    .ticker-token{ display:inline-flex; align-items:center; gap:0; padding:.05rem 0 .05rem .20rem; border-radius:.5rem; cursor:pointer; user-select:none; transition: background .15s ease, box-shadow .15s ease; }
+    .ticker-token:hover{ background: rgba(255,255,255,.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+    .ticker-label{ color:var(--gold); font-weight:800 }
+    .ticker-arrow{ width:12px; height:12px; opacity:.75; transform: translateY(-.5px); }
+    .hide-btn{ font-size: 11px; text-transform: lowercase; color: rgba(255,255,255,.55); margin-left: .5rem; border: 1px solid rgba(255,255,255,.14); border-radius: 9999px; padding: 2px 6px; background: rgba(255,255,255,.06); }
+    .hide-btn:hover{ color:#fff; border-color: rgba(255,255,255,.35); }
+    .see-btn{ font-size: 11px; text-transform: lowercase; color:#c9ffee; border:1px solid rgba(0,255,122,.55); border-radius:9999px; padding:2px 8px; background: rgba(0,255,122,.10); box-shadow: 0 0 10px rgba(0,255,122,.15) inset; }
+    .see-btn:hover{ filter:brightness(1.08); }
+    .pop { animation: pop .18s ease-out }
+    @keyframes pop { from{ transform:scale(.98); opacity:.0 } to{ transform:scale(1); opacity:1 } }
+  </style>
+</head>
+<body class="text-zinc-100">
+  <div class="max-w-7xl mx-auto p-4 lg:p-8">
+    <header class="flex items-center justify-between mb-4">
+      <div>
+        <div class="live-wrap">
+          <span id="liveDot" class="live-dot" aria-hidden="true"></span>
+          <h1 class="text-2xl md:text-3xl font-black tracking-tight neon">ASX Bets Live</h1>
+        </div>
+        <p class="text-sm text-zinc-400 mt-1">A real-time feed of r/asxbets comments across all posts.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="chip" id="status">connecting…</span>
+        <a href="https://www.reddit.com/r/asxbets/" target="_blank" class="chip">r/asxbets ↗</a>
+        <a href="https://buymeacoffee.com/essjayjay" target="_blank" rel="noopener" class="btn-tip inline-flex items-center justify-center flex-shrink-0 px-3 py-2 text-xs sm:text-[12px] leading-none whitespace-nowrap" title="Send a tip">
+          <span class="sm:hidden">Tip me pls</span><span class="hidden sm:inline">Send a tip to keep the lights on</span>
+        </a>
+      </div>
+    </header>
+    <div id="err" class="mb-4 p-3 rounded-lg border border-red-400/50 text-red-200 bg-red-950/30"></div>
+    <div class="grid grid-cols-1 lg:grid-cols-7 gap-6">
+      <main class="glass rounded-2xl p-4 md:p-6 col-span-1 lg:col-span-5 min-h-[65vh]">
+        <div class="flex items-center gap-3 mb-3 flex-wrap">
+          <button id="pauseBtn" class="btn-pause" type="button">Pause</button>
+          <span class="text-xs text-zinc-400"><strong>Live updates</strong></span>
+        </div>
+        <div id="main-pane" class="space-y-4"></div>
+      </main>
+      <aside class="col-span-1 lg:col-span-2">
+        <div class="glass rounded-2xl p-4 mb-4">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm uppercase tracking-wider text-zinc-400">Top Tickers (ASX Focus)</h2>
+            <button id="reset-hidden" class="text-[11px] text-zinc-400 hover:text-zinc-200 underline decoration-dotted hidden" type="button">reset hidden</button>
+          </div>
+          <ol id="top-tickers" class="space-y-1 text-[13px]"><li class="text-zinc-500">loading…</li></ol>
+        </div>
+        <div class="mb-4">
+          <a
+            href="https://bestregardsintel.substack.com/"
+            target="_blank"
+            rel="noopener"
+            class="btn-tip w-full block text-center px-4 py-3 font-bold"
+            title="Subscribe to Best Regards"
+          >
+            Subscribe to <em>Best Regards</em> for tomorrow's top market catalysts
+          </a>
+        </div>
+        <div class="glass rounded-2xl p-4 max-h=[65vh] overflow-y-auto">
+          <h2 class="text-sm uppercase tracking-wider text-zinc-400 mb-3">Recent Posts</h2>
+          <div id="posts" class="space-y-3"></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+  <footer class="mt-8 border-t border-zinc-800/60">
+    <div class="max-w-7xl mx-auto px-4 lg:px-8 py-6">
+      <p class="text-[11px] uppercase tracking-[0.2em] text-zinc-500/70 text-left">NONE OF THIS IS FINANCIAL ADVICE, IDIOTS.</p>
+    </div>
+  </footer>
+  <template id="comment-card">
+    <article class="frame fade-in">
+      <div class="p-4 md:p-5">
+        <header class="mb-3">
+          <div class="flex items-center gap-2 text-xs text-zinc-300">
+            <span class="chip">u:<span data-author></span></span>
+            <span class="chip">score <span data-score></span></span>
+            <span class="chip"><span data-time></span></span>
+          </div>
+          <h3 class="mt-3 font-semibold text-lg"><a data-post-link href="#" target="_blank"></a></h3>
+        </header>
+        <section class="space-y-3">
+          <div class="pl-4 thread-guide space-y-3" data-thread></div>
+        </section>
+        <footer class="mt-4 text-sm"><a data-comment-link href="#" target="_blank" class="underline decoration-dotted">Open comment ↗</a></footer>
+      </div>
+    </article>
+  </template>
+  <template id="post-mini">
+    <article class="frame p-3 hover:gain-border transition">
+      <a data-post-link href="#" target="_blank" class="block font-semibold"></a>
+      <div class="text-xs text-zinc-400 mt-1">
+        by <span data-author></span> • <span data-time></span> • <span data-score></span> ▲ • <span data-comments></span> comments
+      </div>
+    </article>
+  </template>
+  <div id="commentsModal" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" data-close-modal></div>
+    <div class="absolute inset-x-0 top-10 sm:top-16 mx-auto max-w-2xl px-4">
+      <div class="glass rounded-2xl shadow-xl pop">
+        <header class="flex items-center justify-between p-4 border-b border-white/10">
+          <div>
+            <h3 id="modalTitle" class="text-lg font-bold tracking-tight"></h3>
+            <p id="modalSubtitle" class="text-xs text-zinc-400"></p>
+          </div>
+          <button id="modalClose" class="chip text-[11px]" type="button">Esc to close</button>
+        </header>
+        <div class="p-4"><div id="modalList" class="max-h-[70vh] overflow-y-auto space-y-3 pr-1"></div></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    // 💥 UPDATED API BASE URL 💥
+    const API_BASE = "https://asxbets-live-api.mjung4.workers.dev";
+    
+    // ===== tiny fetch helper with timeouts/retries =====
+    async function fetchJson(url, { timeoutMs = 4500, retries = 2, backoff = 600 } = {}) {
+      for (let a = 0; a <= retries; a++) {
+        const ctl = new AbortController();
+        const to = setTimeout(() => ctl.abort(), timeoutMs + a * 300);
+        try {
+          const r = await fetch(url, { headers: { Accept: "application/json" }, cache: "no-store", signal: ctl.signal });
+          clearTimeout(to);
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return await r.json();
+        } catch (e) {
+          clearTimeout(to);
+          if (a === retries) return null;
+          await new Promise(res => setTimeout(res, backoff * (a + 1)));
+        }
+      }
+      return null;
+    }
+
+    // ===== UI bits =====
+    const statusEl  = document.getElementById("status");
+    const liveDot   = document.getElementById("liveDot");
+    const mainPane  = document.getElementById("main-pane");
+    const postsEl   = document.getElementById("posts");
+    const errEl     = document.getElementById("err");
+    const tmpl      = document.getElementById("comment-card");
+    const postTmpl  = document.getElementById("post-mini");
+    const pauseBtn  = document.getElementById("pauseBtn");
+
+    function showErr(msg) {
+      errEl.style.display = 'block';
+      errEl.textContent = msg;
+    }
+    function clearErr() { errEl.style.display = 'none'; errEl.textContent = ""; }
+
+    // ===== ticker detection =====
+    // UPDATED: Initial set for ASX context (common ASX stocks)
+    let TICKER_ALLOW = new Set(["BHP","CBA","WBC","ANZ","NAB","CSL","RIO","FMG","APT"]);
+    (async () => {
+      // NOTE: This will attempt to fetch a new list of tickers, which would ideally be ASX-focused
+      try { const j = await fetchJson(API_BASE + "/tickers", { timeoutMs: 3000, retries: 0 }); if (j?.tickers?.length) TICKER_ALLOW = new Set(j.tickers.map(s=>String(s).toUpperCase())); } catch {}
+    })();
+    const DYNAMIC_ALLOW = new Set();
+    const TICKER_RE = /\$?[A-Z]{1,5}(?:[.-][A-Z]{1,2})?/g;
+    // NOTE: ASX tickers are generally 3 letters. The original code handles 1-5.
+    // The logic below ensures short tickers (length <= 2) only pass if they had a '$'
+    // which is suitable for both US and AUS context (where $ prefix indicates a definite ticker)
+    const acceptSymbol = (sym, hadDollar) => (sym.length <= 2 ? hadDollar : (hadDollar || TICKER_ALLOW.has(sym) || DYNAMIC_ALLOW.has(sym)));
+    function extractUniqueTickers(text){ if(!text) return []; const set=new Set(); for(const m of (text.match(TICKER_RE)||[])){ const hadDollar=m.startsWith("$"); const sym=m.replace(/^\$/,'').toUpperCase(); if (acceptSymbol(sym,hadDollar)) set.add(sym); } return [...set]; }
+    function highlightTickers(s){ if(!s) return ""; return s.replace(TICKER_RE, m=>{ const hadDollar=m.startsWith("$"); const sym=m.replace(/^\$/,'').toUpperCase(); if(acceptSymbol(sym,hadDollar)){ return `<span class="ticker-token" data-see="${sym}" title="See ${sym} comments"><span class="ticker-label">${sym}</span><svg class="ticker-arrow" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M7 5l5 5-5 5"/></svg></span>`;} return m; }); }
+    const formatUser = (a) => String(a || "unknown").replace(/^u\//i, "");
+    function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[s])); }
+    function stripHtmlToText(html){ const el=document.createElement("div"); el.innerHTML=html||""; return el.textContent||el.innerText||""; }
+    function timeAgo(ms){ const s=Math.max(1,Math.floor((Date.now()-ms)/1000)); if(s<60)return s+"s ago"; const m=Math.floor(s/60); if(m<60)return m+"m ago"; const h=Math.floor(m/60); if(h<24)return h+"h ago"; const d=Math.floor(h/24); return d+"d ago"; }
+
+    // ===== Top tickers state (All other ticker logic remains the same) =====
+    const TOP_TICKERS_N = 15;
+    const WINDOW_MS = 60*60*1000;
+    const mentionQueue = []; const counts = new Map(); const countedComments = new Set(); const commentsByTicker = new Map();
+    let hiddenTickers = new Set(JSON.parse(localStorage.getItem("wsb_hidden_tickers") || "[]"));
+    const saveHidden = ()=> localStorage.setItem("wsb_hidden_tickers", JSON.stringify([...hiddenTickers]));
+
+    function addCommentMentions(commentId, plainText){
+      if (!plainText || countedComments.has(commentId)) return;
+      const syms = extractUniqueTickers(plainText);
+      if (!syms.length) { countedComments.add(commentId); return; }
+      const now = Date.now();
+      syms.forEach(sym => { mentionQueue.push({ sym, t: now, commentId }); counts.set(sym, (counts.get(sym) || 0) + 1); DYNAMIC_ALLOW.add(sym); });
+      countedComments.add(commentId);
+      pruneAndRenderTop();
+    }
+    function indexCommentMentionsForSyms(meta, syms){
+      if (!Array.isArray(syms) || !syms.length) return;
+      const t = meta?.created_utc ? meta.created_utc*1000 : Date.now();
+      const base = { id: meta?.id || meta?.name || meta?.permalink || Math.random().toString(36).slice(2), t, author: meta?.author || "unknown", score: meta?.score ?? 0, body_html: meta?.body_html, body: meta?.body, permalink: meta?.permalink || "#", postTitle: meta?.post?.title || meta?.postTitle || "" };
+      syms.forEach(S0 => { const S = String(S0).toUpperCase(); const arr = commentsByTicker.get(S) || []; if (!arr.some(x => x.id === base.id)) { arr.unshift({...base}); arr.sort((a,b)=> b.t - a.t); if (arr.length > 400) arr.length = 400; commentsByTicker.set(S, arr);} if (openModalSym === S) renderModal(S); });
+    }
+    function indexCommentMentions(meta, plain){ if(!plain) return; const syms = extractUniqueTickers(plain); if(!syms.length) return; indexCommentMentionsForSyms(meta, syms); }
+
+    function addSeedEntries(entries){
+      if (!Array.isArray(entries)) return;
+
+      for (const e of entries){
+        if (!e || !e.sym || typeof e.t !== "number") continue;
+
+        const S = String(e.sym).toUpperCase();
+        const cid = e.commentId || `${S}-${e.t}`; // stable id for dedupe
+        const tms = e.t;
+
+        const alreadyCounted = countedComments.has(cid);
+
+        DYNAMIC_ALLOW.add(S);
+
+        if (!alreadyCounted) {
+          mentionQueue.push({ sym: S, t: tms, commentId: cid });
+          counts.set(S, (counts.get(S) || 0) + 1);
+          countedComments.add(cid);
+        }
+
+        const providedText = (e.body || e.snippet || "").trim();
+        const fallbackText = providedText || "(preloaded mention; full body not available yet)";
+        const meta = {
+          id: cid,
+          author: e.author || "u/unknown",
+          score: e.score ?? 0,
+          created_utc: Math.floor(tms / 1000),
+          body: fallbackText,
+          body_html: "",
+          permalink: e.permalink || "#",
+          post: { title: e.postTitle || "", permalink: e.postPermalink || e.permalink || "#" },
+          postTitle: e.postTitle || ""
+        };
+        indexCommentMentionsForSyms(meta, [S]);
+      }
+
+      pruneAndRenderTop();
+    }
+
+    function pruneAndRenderTop(){
+      const list = document.getElementById("top-tickers");
+      const resetBtn = document.getElementById("reset-hidden");
+      const cutoff = Date.now() - WINDOW_MS;
+      while (mentionQueue.length && mentionQueue[0].t < cutoff){
+        const old = mentionQueue.shift();
+        const cur = (counts.get(old.sym) || 0) - 1;
+        if (cur <= 0) counts.delete(old.sym); else counts.set(old.sym, cur);
+      }
+      list.innerHTML = "";
+      const top = Array.from(counts.entries()).filter(([sym]) => !hiddenTickers.has(sym)).sort((a,b)=>b[1]-a[1]).slice(0, TOP_TICKERS_N);
+      if (!top.length) {
+        const li = document.createElement("li"); li.className = "text-zinc-500"; li.textContent = "listening…"; list.appendChild(li);
+      } else {
+        top.forEach(([sym, cnt]) => {
+          const li = document.createElement("li");
+          li.className = "flex items-center justify-between gap-2";
+          li.innerHTML = `<span class="truncate"><span class="ticker-label">${sym}</span> <span class="text-zinc-400">— ${cnt}</span></span><div class="flex items-center gap-2 flex-shrink-0"><button class="see-btn" data-see="${sym}" type="button">See comments</button><button class="hide-btn" data-hide="${sym}" type="button">hide</button></div>`;
+          list.appendChild(li);
+        });
+        list.classList.add("flash"); setTimeout(()=> list.classList.remove("flash"), 420);
+      }
+      resetBtn.classList.toggle("hidden", hiddenTickers.size === 0);
+    }
+    // modal
+    const modalEl = document.getElementById("commentsModal");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalSubtitle = document.getElementById("modalSubtitle");
+    const modalList = document.getElementById("modalList");
+    let openModalSym = null;
+    const inflightByTicker = new Set();
+    function getRecentComments(sym){
+      const arr = commentsByTicker.get(sym) || [];
+      const cutoff = Date.now() - WINDOW_MS;
+      const fresh = arr.filter(x => x.t >= cutoff);
+      if (fresh.length !== arr.length) commentsByTicker.set(sym, fresh);
+      return fresh;
+    }
+    async function backfillTicker(sym){
+      if (inflightByTicker.has(sym)) return; inflightByTicker.add(sym);
+      try{
+        const data = await fetchJson(`${API_BASE}/by_ticker?sym=${encodeURIComponent(sym)}&minutes=60&ts=${Date.now()}`, { timeoutMs: 6000, retries: 2 });
+        const list = Array.isArray(data) ? data : (data?.items || []);
+        for (const item of list){
+          const c = item.comment || item;
+          const p = item.post || { title: item.postTitle, permalink: item.postPermalink || item.permalink };
+          indexCommentMentionsForSyms({ ...c, post: p }, [sym]);
+        }
+      } catch {} finally {
+        inflightByTicker.delete(sym);
+        if (openModalSym === sym) renderModal(sym);
+      }
+    }
+    function openModal(sym){ openModalSym = sym; renderModal(sym); if (getRecentComments(sym).length === 0) backfillTicker(sym); modalEl.classList.remove("hidden"); document.body.style.overflow = "hidden"; }
+    function closeModal(){ openModalSym = null; modalEl.classList.add("hidden"); document.body.style.overflow = ""; modalList.innerHTML = ""; }
+    function renderModal(sym){
+      const items = getRecentComments(sym);
+      modalTitle.innerHTML = `<span class="ticker-label">${sym}</span> comments`;
+      modalSubtitle.textContent = `${items.length} mention${items.length===1?"":"s"} in the last hour`;
+      modalList.innerHTML = "";
+      if (!items.length){
+        const empty = document.createElement("div");
+        empty.className = "text-sm text-zinc-400";
+        empty.textContent = "Fetching comments for this ticker…";
+        modalList.appendChild(empty);
+        return;
+      }
+      for (const c of items){
+        const card = document.createElement("article");
+        card.className = "frame p-3 md:p-4";
+        const when = timeAgo(c.t);
+        const plain = (c.body_html ? stripHtmlToText(c.body_html) : (c.body || "")).trim();
+        const hi = highlightTickers(escapeHtml(plain || "(preloaded mention; full body not available yet)"));
+        card.innerHTML = `
+          <header class="flex items-center justify-between text-xs text-zinc-300 mb-2">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="chip">u:${escapeHtml(formatUser(c.author))}</span>
+              <span class="chip">score ${c.score ?? 0}</span>
+              <span class="chip">${when}</span>
+            </div>
+            <a href="${c.permalink}" target="_blank" rel="noopener" class="underline decoration-dotted">Open on Reddit ↗</a>
+          </header>
+          ${c.postTitle ? `<h4 class="font-semibold text-sm mb-2">${escapeHtml(c.postTitle)}</h4>` : ``}
+          <div class="text-sm body-html"><p>${hi}</p></div>
+        `;
+        modalList.appendChild(card);
+      }
+    }
+
+    document.addEventListener("click", (e) => {
+      try {
+        const hideBtn = e.target.closest(".hide-btn");
+        if (hideBtn && hideBtn.hasAttribute("data-hide")) { hiddenTickers.add(hideBtn.getAttribute("data-hide")); saveHidden(); pruneAndRenderTop(); return; }
+        if (e.target && e.target.id === "reset-hidden") { hiddenTickers.clear(); saveHidden(); pruneAndRenderTop(); return; }
+        const seeBtn = e.target.closest(".see-btn, .ticker-token");
+        if (seeBtn && seeBtn.hasAttribute("data-see")) { openModal(seeBtn.getAttribute("data-see")); return; }
+        if (e.target && (e.target.id === "modalClose" || e.target.hasAttribute("data-close-modal"))) { closeModal(); return; }
+      } catch {}
+    });
+
+    // ===== live 5s poller (strict forward) =====
+    let _lastShownMs = 0;
+    let paused = false;
+    let tickTimer = null;
+    let healthTimer = null;
+    let consecutiveFailures = 0;
+    let _lastRendered = null;
+
+    function setPaused(p){
+      paused = p;
+      pauseBtn.textContent = paused ? "Unpause" : "Pause";
+      liveDot.classList.toggle("paused", paused);
+      statusEl.textContent = paused ? "paused" : "live";
+      if (paused) stopTimers(); else startTimers();
+    }
+    pauseBtn.addEventListener("click", () => setPaused(!paused));
+
+    function startTimers(){
+      stopTimers();
+      tickTimer = setInterval(pollOnce, 5000);
+      healthTimer = setInterval(healthCheck, 15000);
+      pollOnce();
+      healthCheck();
+    }
+    function stopTimers(){
+      if (tickTimer) clearInterval(tickTimer);
+      if (healthTimer) clearInterval(healthTimer);
+      tickTimer = null; healthTimer = null;
+    }
+
+    async function healthCheck(){
+      const h = await fetchJson(API_BASE + "/health", { timeoutMs: 2500, retries: 0 });
+      if (!h?.ok) {
+        statusEl.textContent = "reconnecting…";
+      } else if (!paused) {
+        statusEl.textContent = "live";
+      }
+    }
+
+    async function pollOnce(){
+      if (paused) return;
+
+      const res = await fetchJson(`${API_BASE}/recent_comments?minutes=3&ts=${Date.now()}`, { timeoutMs: 2200, retries: 0 });
+      if (!res) {
+        consecutiveFailures++;
+        statusEl.textContent = "reconnecting…";
+        if (consecutiveFailures >= 3) showErr("Network hiccup contacting API. Retrying…");
+        if (_lastRendered) renderMain(_lastRendered);
+        return;
+      }
+      clearErr();
+      consecutiveFailures = 0;
+
+      const list = Array.isArray(res) ? res : (res.items || []);
+      if (!Array.isArray(list) || list.length === 0) {
+        if (_lastRendered) renderMain(_lastRendered);
+        statusEl.textContent="live";
+        return;
+      }
+
+      const chosen = list[0];
+      const c = chosen.comment || chosen;
+      const ts = Math.min(((c?.created_utc||0)*1000) || Date.now(), Date.now());
+
+      if (ts > _lastShownMs) {
+        const post = chosen.post || { title: chosen.postTitle, permalink: chosen.postPermalink || chosen.permalink };
+        const parents = chosen.parents || [];
+        const payload = { comment: c, parents, post };
+        renderMain(payload);
+        _lastRendered = payload;
+        return;
+      }
+
+      if (_lastRendered) {
+        renderMain(_lastRendered);
+      } else {
+        const post = chosen.post || { title: chosen.postTitle, permalink: chosen.postPermalink || chosen.permalink };
+        const parents = chosen.parents || [];
+        const payload = { comment: c, parents, post };
+        renderMain(payload);
+        _lastRendered = payload;
+      }
+    }
+
+    function renderMain({ comment, parents, post }){
+      const node = tmpl.content.firstElementChild.cloneNode(true);
+      q(node,"[data-author]").textContent = formatUser(comment.author);
+      q(node,"[data-score]").textContent = comment.score ?? 0;
+      q(node,"[data-time]").textContent  = timeAgo(comment.created_utc*1000);
+      q(node,"[data-post-link]").textContent = post?.title || "(post)";
+      q(node,"[data-post-link]").href = post?.permalink || "#";
+      q(node,"[data-comment-link]").href = comment.permalink;
+
+      const thread = q(node, "[data-thread]");
+      (parents||[]).forEach(p => {
+        const txt = p.body_html ? escapeHtml(stripHtmlToText(p.body_html)) : escapeHtml(p.body || "");
+        thread.appendChild(blockHtml(p, txt, false));
+      });
+      const cText = comment.body_html ? escapeHtml(stripHtmlToText(comment.body_html)) : escapeHtml(comment.body || "");
+      thread.appendChild(blockHtml(comment, cText, true));
+
+      const ts = Math.min((comment.created_utc||0)*1000, Date.now());
+      if (ts > _lastShownMs) _lastShownMs = ts;
+
+      const commentId = comment.id || comment.name || comment.permalink;
+      const plain = stripHtmlToText(comment.body_html||"") || comment.body || "";
+      addCommentMentions(commentId, plain);
+      indexCommentMentions({...comment, post}, plain);
+
+      mainPane.innerHTML = "";
+      mainPane.appendChild(node);
+      statusEl.textContent = "live";
+    }
+    function q(node, sel){ return node.querySelector(sel); }
+    function blockHtml(meta, innerHtml, isCurrent=false){
+      const inner = highlightTickers(innerHtml);
+      const wrap = document.createElement("div");
+      wrap.className = isCurrent ? "current-block gain-border" : "parent-block";
+      if (isCurrent) wrap.classList.add("flash");
+      wrap.innerHTML = `<div class="text-xs text-zinc-300 mb-2">u:${escapeHtml(formatUser(meta.author))} • ${timeAgo(meta.created_utc * 1000)} • score ${meta.score ?? 0}</div><div class="text-sm body-html">${inner}</div>`;
+      return wrap;
+    }
+    // ===== preload top tickers (1h) on boot, with retries =====
+    async function preheatTopTickers(minutes=60){
+      for (let attempt = 1; attempt <= 6; attempt++) {
+        const [r1, r2] = await Promise.allSettled([
+          fetchJson(`${API_BASE}/recent_comments?minutes=${minutes}&ts=${Date.now()}`, { timeoutMs: 9000, retries: 1 }),
+          fetchJson(`${API_BASE}/seed?minutes=${minutes}&ts=${Date.now()}`, { timeoutMs: 9000, retries: 1 }),
+        ]);
+
+        let any = false;
+        if (r1.status === "fulfilled" && r1.value) {
+          const arr = Array.isArray(r1.value) ? r1.value : (r1.value.items || []);
+          for (const it of arr) {
+            const c = it.comment || it;
+            const p = it.post || { title: it.postTitle, permalink: it.postPermalink || it.permalink };
+            const plain = c.body || (c.body_html ? stripHtmlToText(c.body_html) : "");
+            indexCommentMentions({ ...c, post: p }, plain);
+            addCommentMentions(c.id || c.name || c.permalink || Math.random().toString(36).slice(2), plain);
+            any = true;
+          }
+        }
+
+        if (r2.status === "fulfilled" && r2.value) {
+          const entries = Array.isArray(r2.value?.entries) ? r2.value.entries : (Array.isArray(r2.value) ? r2.value : []);
+          if (entries.length) { addSeedEntries(entries); any = true; }
+        }
+
+        if (any) { pruneAndRenderTop(); return; }
+        await new Promise(res => setTimeout(res, Math.min(2000 * attempt, 12000)));
+      }
+      showErr("Top tickers preload had no data yet. It will fill as new comments arrive.");
+    }
+
+    // ===== posts rail =====
+    let _lastPosts = [];
+
+    async function loadPosts(){
+      const p = await fetchJson(API_BASE + "/posts", { timeoutMs: 4500, retries: 1 });
+      const list = (p && Array.isArray(p.posts)) ? p.posts : [];
+
+      if (!list.length) return;
+
+      if (_lastPosts.length && list[0]?.id === _lastPosts[0]?.id) return;
+
+      postsEl.innerHTML = "";
+      for (const post of list) {
+        const node = postTmpl.content.firstElementChild.cloneNode(true);
+        const q = (n,s) => n.querySelector(s);
+        q(node,"[data-post-link]").textContent = post.title;
+        q(node,"[data-post-link]").href = post.permalink;
+        q(node,"[data-author]").textContent = post.author;
+        q(node,"[data-time]").textContent = timeAgo(post.created_utc * 1000);
+        q(node,"[data-score]").textContent = post.score ?? 0;
+        q(node,"[data-comments]").textContent = post.comments ?? 0;
+        postsEl.appendChild(node);
+      }
+
+      _lastPosts = list;
+    }
+
+    // ===== boot =====
+    (async function boot(){
+      const h = await fetchJson(API_BASE + "/health", { timeoutMs: 2500, retries: 0 });
+      if (!h?.ok) showErr("Backend health check failed. If this persists, your Worker may not be deployed.");
+
+      startTimers();
+      preheatTopTickers();
+      loadPosts();
+      setInterval(loadPosts, 60000);
+    })();
+  </script>
+</body>
+</html>

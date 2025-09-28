@@ -55,12 +55,12 @@
           <span id="liveDot" class="live-dot" aria-hidden="true"></span>
           <h1 class="text-2xl md:text-3xl font-black tracking-tight neon">ASX Bets Live</h1>
         </div>
-        <p class="text-sm text-zinc-400 mt-1">A real-time feed of r/asxbets comments across all posts.</p>
+        <p class="text-sm text-zinc-400 mt-1">A real-time feed of r/asx_bets comments across all posts.</p>
       </div>
       <div class="flex items-center gap-2">
         <span class="chip" id="status">connecting…</span>
-        <a href="https://www.reddit.com/r/asxbets/" target="_blank" class="chip">r/asxbets ↗</a>
-        <a href="https://buymeacoffee.com/essjayjay" target="_blank" rel="noopener" class="btn-tip inline-flex items-center justify-center flex-shrink-0 px-3 py-2 text-xs sm:text-[12px] leading-none whitespace-nowrap" title="Send a tip">
+        <a href="https://www.reddit.com/r/asx_bets/" target="_blank" class="chip">r/asxbets ↗</a>
+        <a href="https://buymeacoffee.com/brubiu" target="_blank" rel="noopener" class="btn-tip inline-flex items-center justify-center flex-shrink-0 px-3 py-2 text-xs sm:text-[12px] leading-none whitespace-nowrap" title="Send a tip">
           <span class="sm:hidden">Tip me pls</span><span class="hidden sm:inline">Send a tip to keep the lights on</span>
         </a>
       </div>
@@ -81,17 +81,6 @@
             <button id="reset-hidden" class="text-[11px] text-zinc-400 hover:text-zinc-200 underline decoration-dotted hidden" type="button">reset hidden</button>
           </div>
           <ol id="top-tickers" class="space-y-1 text-[13px]"><li class="text-zinc-500">loading…</li></ol>
-        </div>
-        <div class="mb-4">
-          <a
-            href="https://bestregardsintel.substack.com/"
-            target="_blank"
-            rel="noopener"
-            class="btn-tip w-full block text-center px-4 py-3 font-bold"
-            title="Subscribe to Best Regards"
-          >
-            Subscribe to <em>Best Regards</em> for tomorrow's top market catalysts
-          </a>
         </div>
         <div class="glass rounded-2xl p-4 max-h=[65vh] overflow-y-auto">
           <h2 class="text-sm uppercase tracking-wider text-zinc-400 mb-3">Recent Posts</h2>
@@ -147,7 +136,7 @@
     </div>
   </div>
   <script>
-    // 💥 UPDATED API BASE URL 💥
+    // 💥 API BASE URL 💥
     const API_BASE = "https://asxbets-live-api.mjung4.workers.dev";
     
     // ===== tiny fetch helper with timeouts/retries =====
@@ -186,17 +175,14 @@
     function clearErr() { errEl.style.display = 'none'; errEl.textContent = ""; }
 
     // ===== ticker detection =====
-    // UPDATED: Initial set for ASX context (common ASX stocks)
+    // Initial set for ASX context (common ASX stocks)
     let TICKER_ALLOW = new Set(["BHP","CBA","WBC","ANZ","NAB","CSL","RIO","FMG","APT"]);
     (async () => {
-      // NOTE: This will attempt to fetch a new list of tickers, which would ideally be ASX-focused
+      // This will attempt to fetch a new list of tickers from the API
       try { const j = await fetchJson(API_BASE + "/tickers", { timeoutMs: 3000, retries: 0 }); if (j?.tickers?.length) TICKER_ALLOW = new Set(j.tickers.map(s=>String(s).toUpperCase())); } catch {}
     })();
     const DYNAMIC_ALLOW = new Set();
     const TICKER_RE = /\$?[A-Z]{1,5}(?:[.-][A-Z]{1,2})?/g;
-    // NOTE: ASX tickers are generally 3 letters. The original code handles 1-5.
-    // The logic below ensures short tickers (length <= 2) only pass if they had a '$'
-    // which is suitable for both US and AUS context (where $ prefix indicates a definite ticker)
     const acceptSymbol = (sym, hadDollar) => (sym.length <= 2 ? hadDollar : (hadDollar || TICKER_ALLOW.has(sym) || DYNAMIC_ALLOW.has(sym)));
     function extractUniqueTickers(text){ if(!text) return []; const set=new Set(); for(const m of (text.match(TICKER_RE)||[])){ const hadDollar=m.startsWith("$"); const sym=m.replace(/^\$/,'').toUpperCase(); if (acceptSymbol(sym,hadDollar)) set.add(sym); } return [...set]; }
     function highlightTickers(s){ if(!s) return ""; return s.replace(TICKER_RE, m=>{ const hadDollar=m.startsWith("$"); const sym=m.replace(/^\$/,'').toUpperCase(); if(acceptSymbol(sym,hadDollar)){ return `<span class="ticker-token" data-see="${sym}" title="See ${sym} comments"><span class="ticker-label">${sym}</span><svg class="ticker-arrow" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M7 5l5 5-5 5"/></svg></span>`;} return m; }); }
